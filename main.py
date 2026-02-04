@@ -483,8 +483,7 @@ def main(args):
             losses = loss_fn(model, inputs[s : s + batch_size], reduction="sum")
             loss += losses.item()
         num_samples = inputs.shape[0]
-        context_len = inputs.shape[1] - 1
-        return loss / (num_samples * context_len)
+        return loss / (num_samples * context_size)
 
     state = [model.state, optimizer.state]
 
