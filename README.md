@@ -4,6 +4,9 @@ A minimal decoder-only Transformer language model for learning and experimenting
 
 
 
+![Alt text](./example.svg)
+
+
 ## Quick overview
 
 - Training and inference code lives in `main.py`.
