@@ -15,10 +15,7 @@ import datasets
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
-from mlx.utils import (
-    tree_flatten,
-    tree_unflatten
-)
+from mlx.utils import tree_flatten, tree_unflatten
 from safetensors import safe_open, numpy
 import argparse
 
@@ -193,7 +190,7 @@ def save(model, optimizer, data_src, it, exit_after_save=False):
             "optimizer": optimizer_state,
             "s": data_src.s,
             "perm": np.asarray(data_src.perm),
-            "start": it
+            "start": it,
         }
 
         while not saved:
@@ -268,17 +265,12 @@ def save(model, optimizer, data_src, it, exit_after_save=False):
                 pass
             finally:
                 os.rename(
-                    model_metadata_path
-                    + model_extension
-                    + new_extension,
+                    model_metadata_path + model_extension + new_extension,
                     model_metadata_path + model_extension,
                 )
                 os.rename(
-                    model_metadata_path
-                    + metadata_extension
-                    + new_extension,
-                    model_metadata_path
-                    + metadata_extension,
+                    model_metadata_path + metadata_extension + new_extension,
+                    model_metadata_path + metadata_extension,
                 )
                 print("Model saved.")
         else:
@@ -291,17 +283,15 @@ def save(model, optimizer, data_src, it, exit_after_save=False):
             print(f"\r\nExiting.")
             sys.exit(0)  # Exit immediately
 
+
 class ModelFile:
     identifier: str
     ctime: int
 
-    def __init__(
-        self,
-        identifier: str,
-        ctime: int
-    ):
+    def __init__(self, identifier: str, ctime: int):
         self.identifier = identifier
         self.ctime = ctime
+
 
 def check_model_file(folder):
     def latest_version(name):
@@ -319,13 +309,19 @@ def check_model_file(folder):
                 model_file = latest_version(name)
                 safetensors_files.append(model_file)
 
-    return None if not safetensors_files else max(safetensors_files, key=lambda x: x.ctime)
+    return (
+        None if not safetensors_files else max(safetensors_files, key=lambda x: x.ctime)
+    )
+
 
 latest_model_file: Optional[ModelFile] = None
 model_file_extension = ".safetensors"
 metadata_file_extension = ".metadata"
 
-def load_checkpoint(model, optimizer, data_src, model_file_identifier: Optional[str] = None):
+
+def load_checkpoint(
+    model, optimizer, data_src, model_file_identifier: Optional[str] = None
+):
     def _np2mx(np_dict: Dict[str, np.ndarray]) -> list[tuple[str, mx.array]]:
         new_list = []
         for k, v in np_dict.items():
@@ -336,18 +332,10 @@ def load_checkpoint(model, optimizer, data_src, model_file_identifier: Optional[
         print(f"model file not found.")
         return
 
-    target_file_path = (
-        model_folder
-        + "/"
-        + model_file_identifier
-        + model_file_extension
-    )
+    target_file_path = model_folder + "/" + model_file_identifier + model_file_extension
 
     target_metadata_file_path = (
-        model_folder
-        + "/"
-        + model_file_identifier
-        + metadata_file_extension
+        model_folder + "/" + model_file_identifier + metadata_file_extension
     )
 
     if args.new_model or not os.path.isfile(target_file_path):
@@ -363,9 +351,7 @@ def load_checkpoint(model, optimizer, data_src, model_file_identifier: Optional[
         with open(target_metadata_file_path, "rb") as f:
             checkpoint = dill.load(f)
             if "optimizer" in checkpoint:
-                optimizer_state_flattened = _np2mx(
-                    checkpoint["optimizer"]
-                )
+                optimizer_state_flattened = _np2mx(checkpoint["optimizer"])
                 optimizer_state = tree_unflatten(optimizer_state_flattened)
                 optimizer.state = optimizer_state
 
@@ -378,8 +364,9 @@ def load_checkpoint(model, optimizer, data_src, model_file_identifier: Optional[
 
             if "start" in checkpoint:
                 return checkpoint["start"]
-            
+
     return None
+
 
 class TransformerLM(nn.Module):
     def __init__(
@@ -414,8 +401,9 @@ def to_samples(context_size, dataset):
     dataset = dataset[: samples * window_size]
     return mx.array(dataset.reshape(samples, -1))
 
+
 class DataSrc:
-    def __init__(self, batch_size, context_size, datasets, s = 0):
+    def __init__(self, batch_size, context_size, datasets, s=0):
         self.batch_size = batch_size
         self.context_size = context_size
         self.datasets = datasets
@@ -444,7 +432,9 @@ def main(args):
     steps_per_report = args.steps_per_report
 
     # Load vocab and dataset:
-    vocab, train, valid, test = datasets.load_dataset(args.dataset, save_dir=args.save_dir)
+    vocab, train, valid, test = datasets.load_dataset(
+        args.dataset, save_dir=args.save_dir
+    )
     to_vocab = {i: v for v, i in vocab.items()}
     data_src = DataSrc(batch_size, context_size, train)
 
@@ -479,7 +469,7 @@ def main(args):
     optimizer = optim.AdamW(
         learning_rate=args.learning_rate, weight_decay=args.weight_decay
     )
-    
+
     start = load_checkpoint(model, optimizer, data_src, model_file_identifier)
     if start == None:
         start = 0
@@ -492,7 +482,9 @@ def main(args):
         for s in range(0, inputs.shape[0], batch_size):
             losses = loss_fn(model, inputs[s : s + batch_size], reduction="sum")
             loss += losses.item()
-        return loss / (inputs.size - inputs.shape[0])
+        num_samples = inputs.shape[0]
+        context_len = inputs.shape[1] - 1
+        return loss / (num_samples * context_len)
 
     state = [model.state, optimizer.state]
 
@@ -538,14 +530,14 @@ def main(args):
                 # visualisation
                 context = deque(maxlen=args.context_size)
                 user_input = "spokeswoman said asbestos was"
-                print(">>> "+user_input)
+                print(">>> " + user_input)
                 user_input_indices = to_indices(user_input)
                 context.extend(user_input_indices)
-                for _ in range(100): # visualise only first 100 tokens or less
+                for _ in range(100):  # visualise only first 100 tokens or less
                     x = mx.array(np.array(context))
                     logits = model(x[None, :])
                     token = logits[0, -1, :]
-                    top_k = mx.argpartition(-token, kth=args.top_k-1)[:args.top_k]
+                    top_k = mx.argpartition(-token, kth=args.top_k - 1)[: args.top_k]
                     token = token[top_k]
                     output_logits = nn.log_softmax(token / args.temperature)
                     index = mx.random.categorical(output_logits)
@@ -555,7 +547,7 @@ def main(args):
                     if current_output == "<eos>":
                         break
                     context.append(top_k_detached_index)
-                    print(" "+to_vocab[top_k_detached_index], end='')
+                    print(" " + to_vocab[top_k_detached_index], end="")
 
         if args.eval_test:
             test_loss = eval_fn(test)
@@ -569,13 +561,12 @@ def main(args):
                 print("bye bye!")
                 break
             user_input_indices = to_indices(user_input)
-            # context = np.append(context, user_input_indices)
             context.extend(user_input_indices)
             while True:
                 x = mx.array(np.array(context))
                 logits = model(x[None, :])
                 token = logits[0, -1, :]
-                top_k = mx.argpartition(-token, kth=args.top_k-1)[:args.top_k]
+                top_k = mx.argpartition(-token, kth=args.top_k - 1)[: args.top_k]
                 token = token[top_k]
                 output_logits = nn.log_softmax(token / args.temperature)
                 index = mx.random.categorical(output_logits)
@@ -585,7 +576,7 @@ def main(args):
                 if current_output == "<eos>":
                     break
                 context.append(top_k_detached_index)
-                print(" "+to_vocab[top_k_detached_index], end='')
+                print(" " + to_vocab[top_k_detached_index], end="")
             print("")
 
 
